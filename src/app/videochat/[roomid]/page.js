@@ -1,65 +1,68 @@
 "use client";
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ZegoUIKitPrebuilt } from '@zegocloud/zego-uikit-prebuilt';
 
-function randomText(len) {
+function randomText(len = 5) {
+  const chars = '12345qwertyuiopasdfgh67890jklmnbvcxzMNBVCZXASDQWERTYHGFUIOLKJP';
   let result = '';
-  if (result) return result;
-  var chars = '12345qwertyuiopasdfgh67890jklmnbvcxzMNBVCZXASDQWERTYHGFUIOLKJP',
-    maxPos = chars.length,
-    i;
-  len = len || 5;
-  for (i = 0; i < len; i++) {
-    result += chars.charAt(Math.floor(Math.random() * maxPos));
+  for (let i = 0; i < len; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
 }
 
+const Page = ({ params, searchParams }) => {
+  const containerRef = useRef(null);
+  const [roomId, setRoomId] = useState('');
+  const [username, setUsername] = useState('');
 
-  
-  const Page = ({params,searchParams}) =>  {
-   
-    const roomId = params.roomid;
-    const username = searchParams.username || randomText(5);
-    const userID =  randomText(5);
-//   const roomID = getUrlParams().get('roomID') || randomID(5);
-  let myMeeting = async (element) => {
+  useEffect(() => {
+    if (params?.roomid) {
+      setRoomId(params.roomid);
+    }
 
- // generate Kit Token
- const appID = process.env.appId  ;
- const serverSecret = process.env.serverSecret ;
- const kitToken =  ZegoUIKitPrebuilt.generateKitTokenForTest(appID, serverSecret, roomId,  userID, username);
+    // Use provided username or generate a new one
+    const nameFromQuery = searchParams?.username;
+    setUsername(nameFromQuery || randomText(5));
+  }, [params, searchParams]);
 
- // Create instance object from Kit Token.
- const zp = ZegoUIKitPrebuilt.create(kitToken);
- // start the call
- zp.joinRoom({
-        container: element,
-        sharedLinks: [
-          {
-            name: 'Personal link',
-            url:
-             window.location.protocol + '//' + 
-             window.location.host + window.location.pathname +
-              '?roomID=' +
-              roomId,
-          },
-        ],
-        scenario: {
-         mode: ZegoUIKitPrebuilt.VideoConference,
+  useEffect(() => {
+    if (!roomId || !username || !containerRef.current) return;
+
+    const appID = Number(process.env.NEXT_PUBLIC_APP_ID); // must be number
+    const serverSecret = process.env.NEXT_PUBLIC_SERVER_SECRET;
+
+    if (!appID || !serverSecret) {
+      console.error("Missing appID or serverSecret");
+      return;
+    }
+
+    const userID = randomText(5);
+
+    const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
+      appID,
+      serverSecret,
+      roomId,
+      userID,
+      username
+    );
+
+    const zp = ZegoUIKitPrebuilt.create(kitToken);
+    zp.joinRoom({
+      container: containerRef.current,
+      sharedLinks: [
+        {
+          name: 'Personal link',
+          url: `${window.location.origin}/videochat/${roomId}?username=${username}`, // ✅ fixed URL
         },
-   });
-  };
+      ],
+      scenario: {
+        mode: ZegoUIKitPrebuilt.VideoConference,
+      },
+    });
+  }, [roomId, username]);
 
+  return <div className="videoContainer" ref={containerRef}></div>;
+};
 
-	return (
-	  <div
-      className="videoContainer"
-      ref={myMeeting}
-    //   style={{ width: '100vw', height: '100vh' }}
-    ></div>
-	);
-  }
-  
-  export default Page;
-  
+export default Page;
